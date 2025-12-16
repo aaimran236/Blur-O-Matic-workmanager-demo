@@ -16,6 +16,7 @@
 
 package com.example.bluromatic.workers
 
+import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
@@ -23,6 +24,7 @@ import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
 import android.util.Log
+import androidx.annotation.RequiresPermission
 import androidx.annotation.WorkerThread
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -50,6 +52,7 @@ private const val TAG = "WorkerUtils"
  * @param message Message shown on the notification
  * @param context Context needed to create Toast
  */
+@RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
 fun makeStatusNotification(message: String, context: Context) {
 
     // Make a channel if necessary
