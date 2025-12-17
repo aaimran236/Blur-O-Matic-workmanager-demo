@@ -19,12 +19,16 @@ package com.example.bluromatic.data
 import android.content.Context
 import android.net.Uri
 import androidx.work.Data
+import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.example.bluromatic.KEY_BLUR_LEVEL
 import com.example.bluromatic.KEY_IMAGE_URI
+import com.example.bluromatic.getImageUri
 import com.example.bluromatic.workers.BlurWorker
+import com.example.bluromatic.workers.CleanupWorker
+import com.example.bluromatic.workers.SaveImageToFileWorker
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -36,6 +40,7 @@ architecture pattern.
 
 class WorkManagerBluromaticRepository(context: Context) : BluromaticRepository {
 
+    private var imageUri: Uri = context.getImageUri()
     private val workManager = WorkManager.getInstance(context)
 
     override val outputWorkInfo: Flow<WorkInfo?> = MutableStateFlow(null)
@@ -45,11 +50,43 @@ class WorkManagerBluromaticRepository(context: Context) : BluromaticRepository {
      * @param blurLevel The amount to blur the image
      */
     override fun applyBlur(blurLevel: Int) {
+
+        /*
+        Calling the beginWith() method returns a WorkContinuation object and creates the
+        starting point for a chain of WorkRequests with the first work request in the chain.
+         */
+        // Add WorkRequest to Cleanup temporary images
+        var continuation = workManager.beginWith(OneTimeWorkRequest.from(CleanupWorker::class.java))
+
+        /*
+        Calling OneTimeWorkRequest.from(CleanupWorker::class.java) is the equivalent to
+         calling OneTimeWorkRequestBuilder<CleanupWorker>().build(). Class
+         OneTimeWorkRequest comes from the AndroidX Work library while
+         OneTimeWorkRequestBuilder is a helper function provided by the WorkManager KTX extension.
+         */
+
         // Create WorkRequest to blur the image
         val blurBuilder = OneTimeWorkRequestBuilder<BlurWorker>()
 
+        /*
+        Input and output are passed in and out of a worker via Data objects. Data objects
+        are lightweight containers for key/value pairs. They are meant to store a small
+        amount of data that might pass into and out of a worker from the WorkRequest.
+         */
+        blurBuilder.setInputData(createInputDataForWorkRequest(blurLevel,imageUri))
+
         // Start the work
-        workManager.enqueue(blurBuilder.build())
+        ///workManager.enqueue(blurBuilder.build())
+
+        continuation.then(blurBuilder.build())
+
+        // Add WorkRequest to save the image to the filesystem
+        val save = OneTimeWorkRequestBuilder<SaveImageToFileWorker>()
+            .build()
+        continuation = continuation.then(save)
+
+        // Start the work
+        continuation.enqueue()
     }
 
     /**
@@ -62,8 +99,14 @@ class WorkManagerBluromaticRepository(context: Context) : BluromaticRepository {
      * update the amount of blur to be applied and the Uri to operate on
      * @return Data which contains the Image Uri as a String and blur level as an Integer
      */
+
     private fun createInputDataForWorkRequest(blurLevel: Int, imageUri: Uri): Data {
         val builder = Data.Builder()
+        /*
+        First the helper function creates a Data.Builder object. It then puts the imageUri
+        and the blurLevel into it as key/value pairs. A Data object is then created and
+        returned when it calls return builder.build().
+        */
         builder.putString(KEY_IMAGE_URI, imageUri.toString()).putInt(KEY_BLUR_LEVEL, blurLevel)
         return builder.build()
     }

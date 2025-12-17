@@ -3,11 +3,15 @@ package com.example.bluromatic.workers
 import android.Manifest
 import android.content.Context
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.util.Log
 import androidx.annotation.RequiresPermission
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import androidx.work.workDataOf
 import com.example.bluromatic.DELAY_TIME_MILLIS
+import com.example.bluromatic.KEY_BLUR_LEVEL
+import com.example.bluromatic.KEY_IMAGE_URI
 import com.example.bluromatic.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -27,6 +31,10 @@ class BlurWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, 
     @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
 
     override suspend fun doWork(): Result {
+
+        val resourceUri = inputData.getString(KEY_IMAGE_URI)
+        val blurLevel = inputData.getInt(KEY_BLUR_LEVEL, 1)
+
         makeStatusNotification(
             applicationContext.resources.getString(R.string.blurring_image),
             applicationContext
@@ -40,6 +48,7 @@ class BlurWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, 
          *  special thread pool for potentially blocking IO operations.
          */
         return withContext(Dispatchers.IO){
+
             /*
                 Because this Worker runs very quickly, it is recommended to add a delay in
                 the code to emulate slower running work.
@@ -47,30 +56,53 @@ class BlurWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, 
             // This is an utility function added to emulate slower work.
             delay(DELAY_TIME_MILLIS)
 
-
             //return try {
             return@withContext try {
 
-                val picture = BitmapFactory.decodeResource(
-                    applicationContext.resources,
-                    R.drawable.android_cupcake
+                require(!resourceUri.isNullOrBlank()) {
+                    val errorMessage =
+                        applicationContext.resources.getString(R.string.invalid_input_uri)
+                    Log.e(TAG, errorMessage)
+                    errorMessage
+                }
+//                val picture = BitmapFactory.decodeResource(
+//                    applicationContext.resources,
+//                    R.drawable.android_cupcake
+//                )
+
+
+                /*
+                Since the image source is passed in as a URI, we need a ContentResolver object
+                to read the contents pointed to by the URI.
+                 */
+
+                val resolver = applicationContext.contentResolver
+
+                ///Because the image source is now the passed in URI, use
+                // BitmapFactory.decodeStream() instead of BitmapFactory.decodeResource()
+                // to create the Bitmap object.
+                val picture = BitmapFactory.decodeStream(
+                    resolver.openInputStream(Uri.parse(resourceUri))
                 )
 
-                val output = blurBitmap(picture, 1)
+                val output = blurBitmap(picture, blurLevel)
 
                 // Write bitmap to a temp file
                 val outputUri = writeBitmapToFile(applicationContext, output)
 
-                makeStatusNotification(
-                    "Output is $outputUri",
-                    applicationContext
-                )
+//                makeStatusNotification(
+//                    "Output is $outputUri",
+//                    applicationContext
+//                )
+
+                // The workDataOf() function creates a Data object from the passed in key and value pair.
+                val outputData = workDataOf(KEY_IMAGE_URI to outputUri.toString())
 
                 /*
                  * Note: WorkManager uses Result.success() and Result.failure() to indicate the
                  * final status of the work request being performed.
                  */
-                Result.success()
+                Result.success(outputData)
 
             } catch (throwable: Throwable) {
                 Log.e(
