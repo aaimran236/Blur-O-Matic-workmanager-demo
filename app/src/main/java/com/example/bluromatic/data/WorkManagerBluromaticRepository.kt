@@ -19,12 +19,15 @@ package com.example.bluromatic.data
 import android.content.Context
 import android.net.Uri
 import androidx.work.Data
+import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import com.example.bluromatic.IMAGE_MANIPULATION_WORK_NAME
 import com.example.bluromatic.KEY_BLUR_LEVEL
 import com.example.bluromatic.KEY_IMAGE_URI
+import com.example.bluromatic.TAG_OUTPUT
 import com.example.bluromatic.getImageUri
 import com.example.bluromatic.workers.BlurWorker
 import com.example.bluromatic.workers.CleanupWorker
@@ -55,8 +58,29 @@ class WorkManagerBluromaticRepository(context: Context) : BluromaticRepository {
         Calling the beginWith() method returns a WorkContinuation object and creates the
         starting point for a chain of WorkRequests with the first work request in the chain.
          */
+
         // Add WorkRequest to Cleanup temporary images
+        /*
         var continuation = workManager.beginWith(OneTimeWorkRequest.from(CleanupWorker::class.java))
+         */
+
+        /*
+        In this app, you want to use REPLACE because if a user decides to blur another image
+        before the current one finishes, you want to stop the current one and start blurring
+        the new image.
+
+        You also want to ensure that if a user clicks Start when a work request is already
+        enqueued, then the app replaces the previous work request with the new request. It
+        does not make sense to continue working on the previous request because the app
+        replaces it with the new request anyway.
+         */
+        var continuation = workManager
+            .beginUniqueWork(
+                IMAGE_MANIPULATION_WORK_NAME,
+                ExistingWorkPolicy.REPLACE,
+                OneTimeWorkRequest.from(CleanupWorker::class.java)
+            )
+
 
         /*
         Calling OneTimeWorkRequest.from(CleanupWorker::class.java) is the equivalent to
@@ -82,6 +106,7 @@ class WorkManagerBluromaticRepository(context: Context) : BluromaticRepository {
 
         // Add WorkRequest to save the image to the filesystem
         val save = OneTimeWorkRequestBuilder<SaveImageToFileWorker>()
+            .addTag(TAG_OUTPUT)
             .build()
         continuation = continuation.then(save)
 
