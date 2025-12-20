@@ -19,6 +19,7 @@ package com.example.bluromatic.data
 import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.asFlow
+import androidx.work.Constraints
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequest
@@ -68,8 +69,14 @@ class WorkManagerBluromaticRepository(context: Context) : BluromaticRepository {
      * @param blurLevel The amount to blur the image
      */
     override fun applyBlur(blurLevel: Int) {
-        // Add WorkRequest to Cleanup temporary images
-        ///var continuation = workManager.beginWith(OneTimeWorkRequest.from(CleanupWorker::class.java))
+
+        /*
+         WorkManager supports Constraints. A constraint is a requirement that you must
+         meet before a WorkRequest runs.
+         */
+        val constraints = Constraints.Builder()
+            .setRequiresBatteryNotLow(true)///WorkRequest only runs when the device's battery is not low.
+            .build()
 
        /*
         In this app, you want to use REPLACE because if a user decides to blur another
@@ -89,6 +96,8 @@ class WorkManagerBluromaticRepository(context: Context) : BluromaticRepository {
 
         // Input the Uri for the blur operation along with the blur level
         blurBuilder.setInputData(createInputDataForWorkRequest(blurLevel, imageUri))
+
+        blurBuilder.setConstraints(constraints)
 
         continuation = continuation.then(blurBuilder.build())
 
