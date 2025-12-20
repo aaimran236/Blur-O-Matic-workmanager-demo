@@ -31,7 +31,6 @@ class BlurWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, 
     @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
 
     override suspend fun doWork(): Result {
-
         val resourceUri = inputData.getString(KEY_IMAGE_URI)
         val blurLevel = inputData.getInt(KEY_BLUR_LEVEL, 1)
 
@@ -47,40 +46,24 @@ class BlurWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, 
          * Inside the call to withContext() pass Dispatchers.IO so the lambda function runs in a
          *  special thread pool for potentially blocking IO operations.
          */
-        return withContext(Dispatchers.IO){
+        return withContext(Dispatchers.IO) {
 
-            /*
-                Because this Worker runs very quickly, it is recommended to add a delay in
-                the code to emulate slower running work.
-                 */
             // This is an utility function added to emulate slower work.
             delay(DELAY_TIME_MILLIS)
 
-            //return try {
             return@withContext try {
-
                 require(!resourceUri.isNullOrBlank()) {
                     val errorMessage =
                         applicationContext.resources.getString(R.string.invalid_input_uri)
                     Log.e(TAG, errorMessage)
                     errorMessage
                 }
-//                val picture = BitmapFactory.decodeResource(
-//                    applicationContext.resources,
-//                    R.drawable.android_cupcake
-//                )
-
-
                 /*
                 Since the image source is passed in as a URI, we need a ContentResolver object
                 to read the contents pointed to by the URI.
                  */
-
                 val resolver = applicationContext.contentResolver
 
-                ///Because the image source is now the passed in URI, use
-                // BitmapFactory.decodeStream() instead of BitmapFactory.decodeResource()
-                // to create the Bitmap object.
                 val picture = BitmapFactory.decodeStream(
                     resolver.openInputStream(Uri.parse(resourceUri))
                 )
@@ -90,20 +73,14 @@ class BlurWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, 
                 // Write bitmap to a temp file
                 val outputUri = writeBitmapToFile(applicationContext, output)
 
-//                makeStatusNotification(
-//                    "Output is $outputUri",
-//                    applicationContext
-//                )
-
                 // The workDataOf() function creates a Data object from the passed in key and value pair.
                 val outputData = workDataOf(KEY_IMAGE_URI to outputUri.toString())
 
                 /*
-                 * Note: WorkManager uses Result.success() and Result.failure() to indicate the
-                 * final status of the work request being performed.
-                 */
+                * Note: WorkManager uses Result.success() and Result.failure() to indicate the
+                * final status of the work request being performed.
+                */
                 Result.success(outputData)
-
             } catch (throwable: Throwable) {
                 Log.e(
                     TAG,
@@ -113,7 +90,5 @@ class BlurWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, 
                 Result.failure()
             }
         }
-
     }
-
 }

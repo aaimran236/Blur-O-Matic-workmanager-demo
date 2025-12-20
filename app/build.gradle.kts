@@ -86,4 +86,6 @@ dependencies {
 
     // WorkManager dependency
     implementation("androidx.work:work-runtime-ktx:2.11.0")
+
+    implementation("io.coil-kt:coil-compose:2.5.0") // Use the latest version
 }

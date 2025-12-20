@@ -18,6 +18,7 @@ package com.example.bluromatic.data
 
 import android.content.Context
 import android.net.Uri
+import androidx.lifecycle.asFlow
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequest
@@ -34,6 +35,7 @@ import com.example.bluromatic.workers.CleanupWorker
 import com.example.bluromatic.workers.SaveImageToFileWorker
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.mapNotNull
 
 /*
 The repository handles all interactions with the WorkManager. This structure adheres
@@ -46,34 +48,34 @@ class WorkManagerBluromaticRepository(context: Context) : BluromaticRepository {
     private var imageUri: Uri = context.getImageUri()
     private val workManager = WorkManager.getInstance(context)
 
-    override val outputWorkInfo: Flow<WorkInfo?> = MutableStateFlow(null)
+    ///populate the outputWorkInfo variable
+    /* The call of the getWorkInfosByTagLiveData() method returns LiveData. LiveData is a
+     * lifecycle aware observable data holder. The .asFlow() function converts it to a Flow.
+     */
+    override val outputWorkInfo: Flow<WorkInfo> =
+
+        workManager.getWorkInfosByTagLiveData(TAG_OUTPUT)
+            .asFlow()///The .asFlow() function converts it to a Flow.
+            ///ensure the Flow contains values
+            .mapNotNull {
+                /// .mapNotNull() transform function guarantees that a value exists
+                if (it.isNotEmpty()) it.first() else null
+            }
+
 
     /**
      * Create the WorkRequests to apply the blur and save the resulting image
      * @param blurLevel The amount to blur the image
      */
     override fun applyBlur(blurLevel: Int) {
-
-        /*
-        Calling the beginWith() method returns a WorkContinuation object and creates the
-        starting point for a chain of WorkRequests with the first work request in the chain.
-         */
-
         // Add WorkRequest to Cleanup temporary images
-        /*
-        var continuation = workManager.beginWith(OneTimeWorkRequest.from(CleanupWorker::class.java))
-         */
+        ///var continuation = workManager.beginWith(OneTimeWorkRequest.from(CleanupWorker::class.java))
 
-        /*
-        In this app, you want to use REPLACE because if a user decides to blur another image
-        before the current one finishes, you want to stop the current one and start blurring
-        the new image.
-
-        You also want to ensure that if a user clicks Start when a work request is already
-        enqueued, then the app replaces the previous work request with the new request. It
-        does not make sense to continue working on the previous request because the app
-        replaces it with the new request anyway.
-         */
+       /*
+        In this app, you want to use REPLACE because if a user decides to blur another
+        image before the current one finishes, you want to stop the current one and start
+        blurring the new image.
+        */
         var continuation = workManager
             .beginUniqueWork(
                 IMAGE_MANIPULATION_WORK_NAME,
@@ -82,35 +84,26 @@ class WorkManagerBluromaticRepository(context: Context) : BluromaticRepository {
             )
 
 
-        /*
-        Calling OneTimeWorkRequest.from(CleanupWorker::class.java) is the equivalent to
-         calling OneTimeWorkRequestBuilder<CleanupWorker>().build(). Class
-         OneTimeWorkRequest comes from the AndroidX Work library while
-         OneTimeWorkRequestBuilder is a helper function provided by the WorkManager KTX extension.
-         */
-
-        // Create WorkRequest to blur the image
+        // Add WorkRequest to blur the image
         val blurBuilder = OneTimeWorkRequestBuilder<BlurWorker>()
 
-        /*
-        Input and output are passed in and out of a worker via Data objects. Data objects
-        are lightweight containers for key/value pairs. They are meant to store a small
-        amount of data that might pass into and out of a worker from the WorkRequest.
-         */
-        blurBuilder.setInputData(createInputDataForWorkRequest(blurLevel,imageUri))
+        // Input the Uri for the blur operation along with the blur level
+        blurBuilder.setInputData(createInputDataForWorkRequest(blurLevel, imageUri))
 
-        // Start the work
-        ///workManager.enqueue(blurBuilder.build())
-
-        continuation.then(blurBuilder.build())
+        continuation = continuation.then(blurBuilder.build())
 
         // Add WorkRequest to save the image to the filesystem
         val save = OneTimeWorkRequestBuilder<SaveImageToFileWorker>()
+            /*
+            * Instead of a WorkManager ID, you use a tag to label your work because if your
+             * user blurs multiple images, all of the save image WorkRequests have the same tag
+            * but not the same ID.
+            */
             .addTag(TAG_OUTPUT)
             .build()
         continuation = continuation.then(save)
 
-        // Start the work
+        // Actually start the work
         continuation.enqueue()
     }
 
