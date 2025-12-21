@@ -1,12 +1,14 @@
 package com.example.bluromatic.workers
 
 
+import android.Manifest
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import android.util.Log
+import androidx.annotation.RequiresPermission
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
@@ -27,6 +29,12 @@ import java.util.Date
  */
 private const val TAG = "SaveImageToFileWorker"
 
+    /*
+    In the WorkManagerBluromaticRepository, you add the SaveImageToFileWorker to the WorkManager
+    as a continuation after the BlurWorker. Therefore, it has the same input data. It takes the
+    URI from the input data, creates a bitmap, and then writes that bitmap to disk as a file.
+    If the operation is successful, the resulting output is an image URL.
+    */
 class SaveImageToFileWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
 
     private val title = "Blurred Image"
@@ -35,6 +43,7 @@ class SaveImageToFileWorker(ctx: Context, params: WorkerParameters) : CoroutineW
         Locale.getDefault()
     )
 
+    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     override suspend fun doWork(): Result {
         // Makes a notification when the work starts and slows down the work so that
         // it's easier to see each WorkRequest start, even on emulated devices

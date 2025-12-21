@@ -87,5 +87,12 @@ dependencies {
     // WorkManager dependency
     implementation("androidx.work:work-runtime-ktx:2.11.0")
 
-    implementation("io.coil-kt:coil-compose:2.5.0") // Use the latest version
+    ///Testing
+
+    // Espresso
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
+    // Junit
+    androidTestImplementation("androidx.test.ext:junit:1.3.0")
+    // Work testing
+    androidTestImplementation("androidx.work:work-testing:2.11.0")
 }
